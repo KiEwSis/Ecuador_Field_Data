@@ -1,0 +1,169 @@
+---
+title: "Lab001 Geviz"
+author: "Antonio Morsette"
+date: "2022-10-27"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    highlight: default
+editor_options: 
+  chunk_output_type: console
+---
+# Getting Set Up
+### Load the required packages
+```{r}
+library(ggplot2)
+library(sf)
+library(tidyverse)
+library(dplyr)
+library(ggspatial)
+library(viridis)
+library(tmap)
+```
+
+### Load Data
+We will load the data containing identified bird locations  
+```{r}
+bird <- st_read("F:/Grad School/01-Courses/2-1 Grad Year/EAS 648 - Advanced_Geoviz/Lab/01/Bird/bird.shp")
+study_area <- st_read("F:/Grad School/01-Courses/2-1 Grad Year/EAS 648 - Advanced_Geoviz/Lab/01/Bird/study_area.shp")
+```
+
+### Now let's use the package SF to change the projection
+Because I have a z value in the points, st_transform(bird,32717) was not working. I would get:
+*OGR: Not enough data 
+*Error in CPL_transform(x, crs, aoi, pipeline, reverse, desired_accuracy,  : 
+*OGR error
+I found a I had to remove the z value using st_zm.
+
+I'm reprojecting into WGS 84 / UTM zone 17S. Study area is already in WGS 84 / UTM zone 17S.
+
+```{r}
+bird <- st_transform(st_zm(bird),crs = 32717)
+```
+
+# Map the Data
+To be able to plot the bird data in the map, I converted the data to a sf. If I didn't do this, I would get an error every time I try to plot it.
+
+```{r}
+bird <- st_as_sf(bird, coords = c("Longitude", "Latitude"))
+
+bird %>% ggplot() +
+  geom_sf(data = study_area,
+          fill = "light blue", alpha = .2) +
+  theme_bw() +
+  geom_sf() +
+  theme_bw()
+```
+
+# Interactive Maps
+
+### Interactive Map 1
+I am creating an interactive map of my study area.
+This map is showing what I'd like it to show, but the not the colors. 
+```{r}
+tmap_mode("view")
+bird %>% tm_shape() +
+  tm_sf(data = study_area, 
+        col = "blue", alpha = .2) +
+  tm_shape(bird, projection = c("Longitude", "Latitude")) +
+  tm_symbols()
+```
+
+### Interactive Map 2
+Here I am working to get the colors the way I like them and to add a legend. I found a [video](https://www.youtube.com/watch?v=WsbkVkBLkdQ) to help me. 
+
+```{r}
+tm_shape(study_area) +
+  tm_polygons(id = "Nombre", 
+              col = "blue", 
+              alpha = .2) +
+  tm_shape(bird) +
+  tm_bubbles(id = "Point_Name",
+             size = 0.000025,
+             col = "Total__",
+             popup.vars = TRUE)
+```
+
+### Interactive Map 3
+The colors are based on the total bird calls heard at each site, as opposed the number identified.
+```{r}
+tm_shape(study_area) +
+  tm_polygons(id = "Nombre", 
+              col = "blue", 
+              alpha = .2) +
+  tm_shape(bird) +
+  tm_bubbles(id = "Point_Name",
+             size = 0.000025,
+             col = "Bird_Calls",
+             popup.vars = TRUE)
+```
+The colors vary more in this map.
+
+## Final Interactive Map
+This map shows the difference between Maps 2 and 3, together. 
+```{r}
+tmap_mode("view")
+tm_shape(study_area) +
+  tm_polygons(id = "Nombre", 
+              col = "blue", 
+              alpha = .2) +
+  tm_shape(bird) +
+  tm_bubbles(id = "Point_Name",
+             size = 0.000025,
+             col = c("Bird_Calls","Total__"),
+             popup.vars = TRUE)
+```
+
+
+# Plot the Data
+
+First, we're going to see how many observations are at each property
+```{r}
+properties <- bird %>% 
+  group_by(Property) %>% 
+  tally()
+
+head(properties)
+
+####grouped by total bird calls heard
+
+properties2<- bird %>% 
+  group_by(Property) %>% 
+  tally(Bird_Calls)
+head(properties2)
+
+
+####grouped by total bird calls identified
+properties3<- bird %>% 
+  group_by(Property) %>% 
+  tally(Total__)
+head(properties3)
+```
+
+### Plot Birds Identified
+Next we will be plotting our data to see the means of our different plots. We are plotting how many birds were identified at each property. 
+```{r}
+bird %>%
+  group_by('Property') %>%
+  ggplot(aes(x=Property, y=Total__)) + 
+  geom_boxplot()
+
+```
+
+More analysis will need to be done to  see the differences in the different plots. There are two types of plots, mono-culture and non-mono-culture. As it stands now, there is very little difference in the data.
+
+### Plot Total Bird Calls
+We're going to plot the total bird calls heard at each site, as opposed the number identified. 
+```{r}
+bird %>%
+  group_by('Property') %>%
+  ggplot(aes(x=Property, y=Bird_Calls)) + 
+  geom_boxplot()
+```
+
+The plots look much different here. Again, more analysis is needed for the different plots, but there does seem to be a bigger difference in the means here. 
+
+
+
